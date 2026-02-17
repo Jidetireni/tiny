@@ -1,6 +1,4 @@
-# System Design: URL Shortener Service
-
-## 🛠️ Non-Functional Requirements
+## Non-Functional Requirements
 
 ### 1. Low Latency (The "Need for Speed")
 
@@ -53,5 +51,3 @@ The system must handle massive growth in both request volume and data footprint.
 * **Custom Aliases:** Support for user-defined slugs (e.g., `short.com/my-link`).
 
 ---
-
-**Would you like me to calculate the specific "back-of-the-envelope" math for your daily bandwidth and storage requirements?**
