@@ -1,0 +1,11 @@
+package shorten
+
+import (
+	"net/http"
+)
+
+func ShortenHandler(svc *Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// TODO: decode request, call svc.Shorten(longURL)
+	}
+}

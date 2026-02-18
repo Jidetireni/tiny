@@ -1,6 +1,6 @@
 ## Non-Functional Requirements
 
-### 1. Low Latency (The "Need for Speed")
+### 1. Low Latency:
 
 Redirection must be perceived as "real-time." While a 200ms goal is standard, top-tier systems aim for **<50ms**.
 
