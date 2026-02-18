@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Jidetireni/tiny/config"
+	"github.com/Jidetireni/tiny/internals/shorten"
+	"github.com/Jidetireni/tiny/pkg/cassandra"
 	"github.com/Jidetireni/tiny/pkg/zookeeper"
 )
 
@@ -28,12 +30,14 @@ func run(ctx context.Context) error {
 	zookeeper, err := zookeeper.New(config)
 	if err != nil {
 	}
-	// ... initialize other stores
+
+	cassandra := cassandra.New()
+
+	shortenService := shorten.New(zookeeper, cassandra)
 
 	srv := NewServer(
 		config,
-		zookeeper,
-		// ...
+		shortenService,
 	)
 
 	httpServer := &http.Server{
