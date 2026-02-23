@@ -3,31 +3,22 @@ package shorten
 import (
 	"sync"
 
-	"github.com/Jidetireni/tiny/pkg/cassandra"
-	"github.com/Jidetireni/tiny/pkg/zookeeper"
+	gocql "github.com/apache/cassandra-gocql-driver/v2"
+	"github.com/go-zookeeper/zk"
 )
 
-var _ ZookeeperStore = (*zookeeper.Zookeeper)(nil)
-var _ CassandraStore = (*cassandra.Cassandra)(nil)
-
-type ZookeeperStore interface {
-	GetNextRange(path string, blockSize int64) (int64, int64, error)
-}
-
-type CassandraStore interface{}
-
 type Service struct {
-	zk        ZookeeperStore
-	cassandra CassandraStore
+	zkConn    *zk.Conn
+	session   *gocql.Session
 	mu        sync.Mutex
 	currentID int64
 	rangeEnd  int64
 }
 
-func New(zk ZookeeperStore, cassandra CassandraStore) *Service {
+func New(zkConn *zk.Conn, session *gocql.Session) *Service {
 	return &Service{
-		zk:        zk,
-		cassandra: cassandra,
+		zkConn:  zkConn,
+		session: session,
 	}
 }
 
@@ -47,7 +38,7 @@ func (s *Service) nextID() (int64, error) {
 	defer s.mu.Unlock()
 
 	if s.currentID >= s.rangeEnd {
-		start, end, err := s.zk.GetNextRange(string(TinyPath), blockSize)
+		start, end, err := getNextRange(s.zkConn, string(TinyPath), blockSize)
 		if err != nil {
 			return 0, err
 		}
