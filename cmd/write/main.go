@@ -31,7 +31,9 @@ func run(ctx context.Context) error {
 	if err != nil {
 	}
 
-	cassandra := cassandra.New()
+	cassandra, err := cassandra.New(&config.CassandraConfig)
+	if err != nil {
+	}
 
 	shortenService := shorten.New(zookeeper, cassandra)
 

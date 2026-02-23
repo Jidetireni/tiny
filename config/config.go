@@ -10,9 +10,9 @@ type ServerConfig struct {
 	Port string
 }
 
-type DatabaseConfig struct {
-	URL  string
-	Type string
+type CassandraConfig struct {
+	Host     string
+	KeySpace string
 }
 
 type ZooKeeperConfig struct {
@@ -36,7 +36,7 @@ func validateENV() {
 
 type Config struct {
 	ServerConfig
-	DatabaseConfig
+	CassandraConfig
 	ZooKeeperConfig
 	RedisConfig
 }
@@ -47,7 +47,7 @@ func New() *Config {
 
 	return &Config{
 		ServerConfig:    ServerConfig{},
-		DatabaseConfig:  DatabaseConfig{},
+		CassandraConfig: CassandraConfig{},
 		ZooKeeperConfig: ZooKeeperConfig{},
 		RedisConfig:     RedisConfig{},
 	}
