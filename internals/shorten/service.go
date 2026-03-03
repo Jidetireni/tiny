@@ -1,35 +1,52 @@
 package shorten
 
 import (
+	"context"
 	"sync"
-
-	gocql "github.com/apache/cassandra-gocql-driver/v2"
-	"github.com/go-zookeeper/zk"
 )
 
+var _ IDGenerator = (*ZookeeperRepo)(nil)
+var _ Repository = (*ShortenRepository)(nil)
+
+type IDGenerator interface {
+	GetNextRange(path string, blockSize int64) (int64, int64, error)
+}
+
+type Repository interface {
+	Create(ctx context.Context, s ShortenedURL) error
+}
+
 type Service struct {
-	zkConn    *zk.Conn
-	session   *gocql.Session
+	idGen     IDGenerator
+	repo      Repository
 	mu        sync.Mutex
 	currentID int64
 	rangeEnd  int64
 }
 
-func New(zkConn *zk.Conn, session *gocql.Session) *Service {
+func New(idGen IDGenerator, repo Repository) *Service {
 	return &Service{
-		zkConn:  zkConn,
-		session: session,
+		idGen: idGen,
+		repo:  repo,
 	}
 }
 
-func (s *Service) Shorten(longURL string) (string, error) {
+func (s *Service) Shorten(ctx context.Context, longURL string) (string, error) {
 	id, err := s.nextID()
 	if err != nil {
 		return "", err
 	}
 
 	shortCode := encode(id)
-	_ = shortCode // TODO: store longURL → shortCode mapping in DB
+
+	if err := s.repo.Create(ctx, ShortenedURL{
+		ID:        shortCode,
+		ShortCode: shortCode,
+		LongURL:   longURL,
+	}); err != nil {
+		return "", err
+	}
+
 	return shortCode, nil
 }
 
@@ -38,7 +55,7 @@ func (s *Service) nextID() (int64, error) {
 	defer s.mu.Unlock()
 
 	if s.currentID >= s.rangeEnd {
-		start, end, err := getNextRange(s.zkConn, string(TinyPath), blockSize)
+		start, end, err := s.idGen.GetNextRange(string(TinyPath), blockSize)
 		if err != nil {
 			return 0, err
 		}

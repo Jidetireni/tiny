@@ -12,7 +12,7 @@ import (
 
 	"github.com/Jidetireni/tiny/config"
 	"github.com/Jidetireni/tiny/internals/shorten"
-	"github.com/Jidetireni/tiny/pkg/cassandra"
+	"github.com/Jidetireni/tiny/pkg/database"
 	"github.com/Jidetireni/tiny/pkg/zookeeper"
 )
 
@@ -25,17 +25,19 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	// 1. Initialize dependencies (The "Ask for it" philosophy starts here)
+
 	config := config.New()
 	zookeeper, err := zookeeper.New(config)
 	if err != nil {
 	}
 
-	cassandra, err := cassandra.New(&config.CassandraConfig)
+	database, err := database.New(config)
 	if err != nil {
 	}
 
-	shortenService := shorten.New(zookeeper.Conn, cassandra.Session)
+	idGen := shorten.NewZookeeper(zookeeper.Conn)
+	repo := shorten.NewShortenRepository(database.Cassandra)
+	shortenService := shorten.New(idGen, repo)
 
 	srv := NewServer(
 		config,
