@@ -1,7 +1,9 @@
 package zookeeper
 
 import (
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Jidetireni/tiny/config"
@@ -23,4 +25,36 @@ func New(config *config.Config) (*Zookeeper, error) {
 	return &Zookeeper{
 		Conn: conn,
 	}, nil
+}
+func (z *Zookeeper) GetNextRange(path string, blockSize int64) (int64, int64, error) {
+	for {
+		data, stat, err := z.Conn.Get(path)
+		if err != nil {
+			if errors.Is(err, zk.ErrNoNode) {
+				_, createErr := z.Conn.Create(path, []byte("0"), 0, zk.WorldACL(zk.PermAll))
+				if createErr != nil && !errors.Is(createErr, zk.ErrNodeExists) {
+					return 0, 0, err
+				}
+				continue
+			}
+			return 0, 0, err
+		}
+
+		start, err := strconv.ParseInt(string(data), 10, 64)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		end := start + blockSize
+
+		_, err = z.Conn.Set(path, []byte(strconv.FormatInt(end, 10)), stat.Version)
+		if err != nil {
+			if errors.Is(err, zk.ErrBadVersion) {
+				continue
+			}
+			return 0, 0, err
+		}
+
+		return start, end, nil
+	}
 }

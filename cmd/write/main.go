@@ -12,6 +12,7 @@ import (
 
 	"github.com/Jidetireni/tiny/config"
 	"github.com/Jidetireni/tiny/internals/shorten"
+	redis_cache "github.com/Jidetireni/tiny/pkg/Redis"
 	"github.com/Jidetireni/tiny/pkg/database"
 	"github.com/Jidetireni/tiny/pkg/zookeeper"
 )
@@ -29,15 +30,26 @@ func run(ctx context.Context) error {
 	config := config.New()
 	zookeeper, err := zookeeper.New(config)
 	if err != nil {
+		return err
 	}
 
 	database, err := database.New(config)
 	if err != nil {
 	}
 
-	idGen := shorten.NewZookeeper(zookeeper.Conn)
+	redis, err := redis_cache.New(config)
+	if err != nil {
+		return err
+	}
+
 	repo := shorten.NewShortenRepository(database.Cassandra)
-	shortenService := shorten.New(idGen, repo)
+
+	shortenService := shorten.New(
+		config,
+		zookeeper,
+		repo,
+		redis,
+	)
 
 	srv := NewServer(
 		config,

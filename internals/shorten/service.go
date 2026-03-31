@@ -2,13 +2,21 @@ package shorten
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
+
+	"github.com/Jidetireni/tiny/config"
+	redis_cache "github.com/Jidetireni/tiny/pkg/Redis"
+	"github.com/Jidetireni/tiny/pkg/zookeeper"
+	"github.com/google/uuid"
 )
 
-var _ IDGenerator = (*ZookeeperRepo)(nil)
 var _ Repository = (*ShortenRepository)(nil)
+var _ ZookeeperService = (*zookeeper.Zookeeper)(nil)
+var _ RedisCacheService = (*redis_cache.RedisCache)(nil)
 
-type IDGenerator interface {
+type ZookeeperService interface {
 	GetNextRange(path string, blockSize int64) (int64, int64, error)
 }
 
@@ -16,54 +24,69 @@ type Repository interface {
 	Create(ctx context.Context, s ShortenedURL) error
 }
 
-type Service struct {
-	idGen     IDGenerator
-	repo      Repository
-	mu        sync.Mutex
-	currentID int64
-	rangeEnd  int64
+type RedisCacheService interface {
+	Get(ctx context.Context, key string, dest any) (any, error)
+	Set(ctx context.Context, key string, value any, ttl time.Duration) error
 }
 
-func New(idGen IDGenerator, repo Repository) *Service {
+type Service struct {
+	Zookeeper  ZookeeperService
+	Repo       Repository
+	RedisCache RedisCacheService
+	Config     *config.Config
+	Mu         sync.Mutex
+	CurrentID  int64
+	RangeEnd   int64
+}
+
+func New(
+	config *config.Config,
+	zookeeper ZookeeperService,
+	repo Repository,
+	redisCache RedisCacheService,
+) *Service {
 	return &Service{
-		idGen: idGen,
-		repo:  repo,
+		Zookeeper:  zookeeper,
+		Repo:       repo,
+		RedisCache: redisCache,
 	}
 }
 
 func (s *Service) Shorten(ctx context.Context, longURL string) (string, error) {
-	id, err := s.nextID()
+	id, err := s.getNextID()
 	if err != nil {
 		return "", err
 	}
 
-	shortCode := encode(id)
+	uniqueCode := base62Encode(uint64(id))
 
-	if err := s.repo.Create(ctx, ShortenedURL{
-		ID:        shortCode,
-		ShortCode: shortCode,
-		LongURL:   longURL,
+	if err := s.Repo.Create(ctx, ShortenedURL{
+		ID:         uuid.New(),
+		UniqueCode: uniqueCode,
+		LongURL:    longURL,
+		CreatedAt:  time.Now(),
 	}); err != nil {
 		return "", err
 	}
 
-	return shortCode, nil
+	_ = s.RedisCache.Set(ctx, RedisUniqueCodeKey(uniqueCode), longURL, UniqueCodeExpirationTTL)
+	return fmt.Sprintf("%s/%s", s.Config.BaseURL, uniqueCode), nil
 }
 
-func (s *Service) nextID() (int64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Service) getNextID() (int64, error) {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
 
-	if s.currentID >= s.rangeEnd {
-		start, end, err := s.idGen.GetNextRange(string(TinyPath), blockSize)
+	if s.CurrentID >= s.RangeEnd {
+		start, end, err := s.Zookeeper.GetNextRange(string(TinyPath), blockSize)
 		if err != nil {
 			return 0, err
 		}
-		s.currentID = start
-		s.rangeEnd = end
+		s.CurrentID = start
+		s.RangeEnd = end
 	}
 
-	id := s.currentID
-	s.currentID++
+	id := s.CurrentID
+	s.CurrentID++
 	return id, nil
 }

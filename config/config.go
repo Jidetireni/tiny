@@ -6,8 +6,9 @@ import (
 )
 
 type ServerConfig struct {
-	Host string
-	Port string
+	Host    string
+	Port    string
+	BaseURL string
 }
 
 type CassandraConfig struct {
@@ -24,6 +25,13 @@ type RedisConfig struct {
 	URL string
 }
 
+type Config struct {
+	ServerConfig
+	CassandraConfig
+	ZooKeeperConfig
+	RedisConfig
+}
+
 func validateENV() {
 	environmentVariables := []string{}
 
@@ -32,13 +40,6 @@ func validateENV() {
 			log.Fatalf("Environment variable %s is not set", env)
 		}
 	}
-}
-
-type Config struct {
-	ServerConfig
-	CassandraConfig
-	ZooKeeperConfig
-	RedisConfig
 }
 
 func New() *Config {
