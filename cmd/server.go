@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/Jidetireni/tiny/config"
+	"github.com/Jidetireni/tiny/internals/redirect"
 	"github.com/Jidetireni/tiny/internals/shorten"
 	"github.com/go-chi/chi/v5"
 )
@@ -11,6 +12,7 @@ import (
 func NewServer(
 	config *config.Config,
 	shortenService *shorten.Service,
+	redirectService *redirect.Service,
 ) http.Handler {
 	// Initialize the router
 	r := chi.NewRouter()
@@ -18,6 +20,7 @@ func NewServer(
 	router(
 		r,
 		shortenService,
+		redirectService,
 	)
 	// 3. Wrap with Middlewares (Logger, Auth, etc.)
 	return r

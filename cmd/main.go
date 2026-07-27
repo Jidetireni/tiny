@@ -7,10 +7,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Jidetireni/tiny/config"
+	"github.com/Jidetireni/tiny/internals/redirect"
 	"github.com/Jidetireni/tiny/internals/shorten"
 	redis_cache "github.com/Jidetireni/tiny/pkg/Redis"
 	"github.com/Jidetireni/tiny/pkg/database"
@@ -18,7 +21,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	if err := run(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
@@ -35,6 +39,7 @@ func run(ctx context.Context) error {
 
 	database, err := database.New(config)
 	if err != nil {
+		return err
 	}
 
 	redis, err := redis_cache.New(config)
@@ -42,18 +47,24 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	repo := shorten.NewShortenRepository(database.Cassandra)
+	shortenRepo := shorten.NewShortenRepository(database.Cassandra)
 
 	shortenService := shorten.New(
 		config,
 		zookeeper,
-		repo,
+		shortenRepo,
+	)
+
+	redirectRepo := redirect.NewRedirectRepository(database.Cassandra)
+	redirectService := redirect.New(
+		redirectRepo,
 		redis,
 	)
 
 	srv := NewServer(
 		config,
 		shortenService,
+		redirectService,
 	)
 
 	httpServer := &http.Server{

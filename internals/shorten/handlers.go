@@ -30,7 +30,7 @@ func HandleShortenURL(svc *Service) http.HandlerFunc {
 			return
 		}
 
-		shortCode, err := svc.Shorten(r.Context(), req.LongURL)
+		shortCode, err := svc.Shorten(r.Context(), &req)
 		if err != nil {
 			httpio.WriteError(w, err)
 			return
